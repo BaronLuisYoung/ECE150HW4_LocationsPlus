@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">LocationPlus</string>
+    <string name="center_on_user">Center on user location</string>
+    <string name="info_details">Show information details</string>
 </resources>
