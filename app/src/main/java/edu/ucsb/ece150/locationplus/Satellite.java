@@ -15,12 +15,19 @@ public class Satellite {
     private float azimuthDegrees;
     private float elevationDegrees;
     private float cn0DbHz; // Carrier-to-Noise Density in dB-Hz
+    private float carrierFrequency; // Carrier Frequency in Hz
+    private String constellationName; // Constellation Name
+    private int svid; // Satellite Vehicle ID
 
-    public Satellite(int prn, float azimuthDegrees, float elevationDegrees, float cn0DbHz) {
+    public Satellite(int prn, float azimuthDegrees, float elevationDegrees, float cn0DbHz,
+                        float carrierFrequency, String constellationName, int svid) {
         this.prn = prn;
         this.azimuthDegrees = azimuthDegrees;
         this.elevationDegrees = elevationDegrees;
         this.cn0DbHz = cn0DbHz;
+        this.carrierFrequency = carrierFrequency;
+        this.constellationName = constellationName;
+        this.svid = svid;
     }
 
     public int getPrn() {
@@ -41,10 +48,12 @@ public class Satellite {
 
     @Override
     public String toString() {
-        return "PRN: " + prn +
-        "\nAzimuth: " + azimuthDegrees +
-        "\nElevation: " + elevationDegrees +
-        "\nC/N0: " + cn0DbHz + " dB-Hz";
+        return "SVID: " + prn +
+                "\nAzimuth: " + azimuthDegrees + "°" +
+                "\nElevation: " + elevationDegrees + "°" +
+                "\nCarrier Frequency: " + carrierFrequency + " Hz" +
+                "\nC/N0: " + cn0DbHz + " dB-Hz" +
+                "\nConstellation: " + constellationName;
     }
 
     public void setAzimuthDegrees(float azimuthDegrees) {

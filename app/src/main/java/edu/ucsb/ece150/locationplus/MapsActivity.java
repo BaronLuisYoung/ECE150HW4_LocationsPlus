@@ -1,7 +1,9 @@
 package edu.ucsb.ece150.locationplus;
 
+import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -14,6 +16,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.Manifest;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ImageButton;
@@ -84,8 +87,6 @@ public class MapsActivity extends AppCompatActivity implements LocationListener,
         satelliteList.setAdapter(adapter);
         satelliteList.setVisibility(ListView.INVISIBLE);
 
-        satelliteArrayList.add(new Satellite(-1, -1, -1, -1));
-
         // Set up Google Maps
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
@@ -115,13 +116,26 @@ public class MapsActivity extends AppCompatActivity implements LocationListener,
             public void onSatelliteStatusChanged(GnssStatus status) {
                 super.onSatelliteStatusChanged(status);
                 Log.i("SATELLITEINFO", "SatChange status: "+status.toString());
-                int satelliteCount = 0;
                 String info_satellite = null;
-                String sat_num = null;
-                satelliteCount = status.getSatelliteCount();
-                sat_num = " Number of Satellites visible : " + satelliteCount + "\n";
-                viewSatCount.setText(sat_num);
-                Log.i("SATELLITEINFO", "SatChange Count: "+satelliteCount);
+                String sat_num_text = null;
+                int satelliteCount = status.getSatelliteCount();
+                sat_num_text = " Number of Satellites visible : " + satelliteCount + "\n";
+                viewSatCount.setText(sat_num_text);
+
+                String fix_num_text = null;
+                int usedInLastFixCount = 0;
+                for (int i = 0; i < satelliteCount; i++) {
+                    if (status.usedInFix(i)) {
+                        usedInLastFixCount++;
+                    }
+                }
+                fix_num_text = "Fix Count : " + usedInLastFixCount + "\n";
+                viewFixCount.setText(fix_num_text);
+
+                // Now 'usedInLastFixCount' contains the number of satellites used in the last fix.
+                final int finalUsedInLastFixCount = usedInLastFixCount;
+
+                //Log.i("SATELLITEINFO", "SatChange Count: "+satelliteCount);
                 satelliteArrayList.clear();
                 for(int sat = 0; sat<satelliteCount; sat++ ){
                     info_satellite = " Satellite No - " + sat + ":" + "\n"
@@ -136,10 +150,37 @@ public class MapsActivity extends AppCompatActivity implements LocationListener,
                     float azimuthDegrees = status.getAzimuthDegrees(sat);
                     float elevationDegrees = status.getElevationDegrees(sat);
                     float cn0DbHz = status.getCn0DbHz(sat);
-
+                    float carrierFrequency = 0;
+                    int svid = status.getSvid(sat);
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        carrierFrequency = status.getCarrierFrequencyHz(sat);
+                    }
+                    else{
+                        Log.d("MapActivity", "onSatelliteStatusChanged: carrier Frequency not available");
+                    }
+                    String constellationName = "";
+                    int constellationType = status.getConstellationType(sat);
+                    switch (constellationType) {
+                        case GnssStatus.CONSTELLATION_GPS:
+                            constellationName = "GPS";
+                            break;
+                        case GnssStatus.CONSTELLATION_GLONASS:
+                            constellationName = "GLONASS";
+                            break;
+                        case GnssStatus.CONSTELLATION_BEIDOU:
+                            constellationName = "BEIDOU";
+                            break;
+                        case GnssStatus.CONSTELLATION_GALILEO:
+                            constellationName = "GALILEO";
+                            break;
+                        // Add more cases for other constellations
+                        default:
+                            constellationName = "UNKNOWN";
+                            break;
+                    }
 
                     Log.i("SATELLITEINFO", "\t \t Details: "+info_satellite);
-                    Satellite newSatellite = new Satellite(prn, azimuthDegrees, elevationDegrees, cn0DbHz);
+                    Satellite newSatellite = new Satellite(prn, azimuthDegrees, elevationDegrees, cn0DbHz, carrierFrequency, constellationName, svid);
                     Log.d("TAG", "onSatelliteStatusChanged: added satellite");
 
                     runOnUiThread(new Runnable() {
@@ -153,7 +194,7 @@ public class MapsActivity extends AppCompatActivity implements LocationListener,
                     });
 
                     if (info_satellite != null) {
-                        Log.i("info_satellite", info_satellite);
+                        //Log.i("info_satellite", info_satellite);
                     }
                 }
 
@@ -161,6 +202,36 @@ public class MapsActivity extends AppCompatActivity implements LocationListener,
         };
 
         // [TODO] Additional setup for viewing satellite information (lists, adapters, etc.)
+
+
+        satelliteList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                // Get the data for the item that was clicked, this could be a custom object depending on your adapter
+                Satellite clickedSatellite = (Satellite) parent.getItemAtPosition(position);
+                String satelliteDetails = clickedSatellite.toString();
+                // Create an AlertDialog Builder
+                AlertDialog.Builder builder = new AlertDialog.Builder(MapsActivity.this);
+                builder.setTitle("Satellite " + position); // Set the title for the dialog
+
+                // Set the message for the AlertDialog, replace 'satelliteData' with the specific data you want to display
+                builder.setMessage(satelliteDetails);
+
+                // Add an OK button to dismiss the dialog
+                builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                    }
+                });
+
+                // Create and show the AlertDialog
+                AlertDialog dialog = builder.create();
+                dialog.show();
+            }
+        });
+
+
         toggleSatelliteListButton = findViewById(R.id.button_satellite_list_toggle);
 
 
@@ -255,6 +326,7 @@ public class MapsActivity extends AppCompatActivity implements LocationListener,
      *
      * You may use them if you need to.
      */
+
     @Override
     public void onProviderDisabled(String provider) {}
 
