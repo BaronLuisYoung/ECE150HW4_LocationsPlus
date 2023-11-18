@@ -47,6 +47,15 @@
         android:layout_height="match_parent"
         tools:context=".MapsActivity" />
 
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fltBtnDelGeoFence"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentBottom="true"
+        android:clickable="true"
+        app:srcCompat="@android:drawable/btn_dialog" />
+
     <ListView
         android:id="@+id/view_satellite_list"
         android:layout_width="408dp"
@@ -57,7 +66,8 @@
         android:layout_alignParentBottom="true"
         android:layout_marginTop="60dp"
         android:layout_marginBottom="-60dp"
-        android:background="@android:color/white" />
+        android:background="@android:color/white" >
+    </ListView>
 
     <TextView
         android:id="@+id/viewSatelliteCount"

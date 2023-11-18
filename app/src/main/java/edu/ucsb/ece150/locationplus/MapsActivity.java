@@ -23,6 +23,7 @@ import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
@@ -38,13 +39,19 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.Circle;
+import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.List;
 
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -52,6 +59,8 @@ public class MapsActivity extends AppCompatActivity implements LocationListener,
 
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
     private Geofence mGeofence;
+    private Marker geofenceMarker;
+
     private GeofencingClient mGeofencingClient;
     private PendingIntent mPendingIntent = null;
 
@@ -73,6 +82,12 @@ public class MapsActivity extends AppCompatActivity implements LocationListener,
     boolean test1 = true;
     private static SharedPreferences sharedPref;
     private SharedPreferences.Editor editor;
+
+    private FloatingActionButton deleteGeoFenceBtn;
+
+    private Circle geofenceCircle; // Declare the Circle object
+
+
     @RequiresApi(api = Build.VERSION_CODES.N)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -104,6 +119,30 @@ public class MapsActivity extends AppCompatActivity implements LocationListener,
         viewFixCount.setVisibility(View.INVISIBLE);
 
         mLocationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+
+        //setup floating action button
+        deleteGeoFenceBtn = findViewById(R.id.fltBtnDelGeoFence);
+        deleteGeoFenceBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                deleteGeoFenceBtn.setVisibility(View.INVISIBLE);
+                if (geofenceMarker != null) {
+                    geofenceMarker.remove();
+                    geofenceMarker = null;
+                }
+
+                // Remove the circle from the map
+                if (geofenceCircle != null) {
+                    geofenceCircle.remove();
+                    geofenceCircle = null;
+                }
+
+                mGeofence = null;
+            }
+        });
+
+        deleteGeoFenceBtn.setVisibility(FloatingActionButton.INVISIBLE);
+
         mGnssStatusCallback = new GnssStatus.Callback() {
 
             @Override
@@ -201,8 +240,7 @@ public class MapsActivity extends AppCompatActivity implements LocationListener,
             }
         };
 
-        // [TODO] Additional setup for viewing satellite information (lists, adapters, etc.)
-
+        // [Done] Additional setup for viewing satellite information (lists, adapters, etc.)
 
         satelliteList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
@@ -245,17 +283,16 @@ public class MapsActivity extends AppCompatActivity implements LocationListener,
                     satelliteList.setVisibility(ListView.INVISIBLE);
                     viewSatCount.setVisibility(View.INVISIBLE);
                     viewFixCount.setVisibility(View.INVISIBLE);
-
                 } else {
-
                     satelliteList.setVisibility(ListView.VISIBLE);
                     viewSatCount.setVisibility(View.VISIBLE);
                     viewFixCount.setVisibility(View.VISIBLE);
                     Log.d("TEST3", "onClick: 3");
-
                 }
             }
         });
+
+
 
         // Set up Toolbar
         mToolbar = (Toolbar) findViewById(R.id.appToolbar);
@@ -266,7 +303,7 @@ public class MapsActivity extends AppCompatActivity implements LocationListener,
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
 
-        // [TODO] Implement behavior when Google Maps is ready
+        // [DONE] Implement behavior when Google Maps is ready
         ImageButton btnCenterOnUser = findViewById(R.id.button_center_on_user);
         btnCenterOnUser.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -290,9 +327,90 @@ public class MapsActivity extends AppCompatActivity implements LocationListener,
             }
         });
 
-        // [TODO] In addition, add a listener for long clicks (which is the starting point for
+
+        // [DONE] In addition, add a listener for long clicks (which is the starting point for
         // creating a Geofence for the destination and listening for transitions that indicate
         // arrival)
+        mMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener() {
+            @Override
+            public void onMapLongClick(LatLng latLng) {
+
+                // Here, 'latLng' is the location where the user has performed a long click
+                new AlertDialog.Builder(MapsActivity.this)
+                        .setTitle("Add Geofence")
+                        .setMessage("Do you want to add a geofence at this location?")
+                        .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+
+
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                // User clicked "Yes", proceed with adding the geofence
+                                // Then, add the geofence to the GeofencingClient
+                                if (ActivityCompat.checkSelfPermission(MapsActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                                    // TODO: Consider calling ActivityCompat#requestPermissions
+                                    // here to request the missing permissions, and then overriding
+                                    // public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults)
+                                    // to handle the case where the user grants the permission.
+                                    return;
+                                }
+
+                                if(mGeofence != null)
+                                {
+                                    geofenceMarker.remove();
+                                    geofenceCircle.remove();
+                                }
+
+                                // You can now use this location to create a geofence
+                                // First, define the geofence using the Geofence.Builder class
+                                Log.d("LAT&LONG", "onClick: " +latLng.latitude + " " + latLng.longitude );
+                                mGeofence = new Geofence.Builder()
+                                        .setRequestId("destination_geofence") // This is a string to identify your geofence
+                                        .setCircularRegion(latLng.latitude, latLng.longitude, 100)
+                                        .setExpirationDuration(Geofence.NEVER_EXPIRE)
+                                        .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER | Geofence.GEOFENCE_TRANSITION_EXIT)
+                                        .build();
+
+                                int fillColor = 0x220000FF; // Adjust the color and transparency as needed (here it's semi-transparent blue)
+                                int strokeColor = 0xFF0000FF; // The stroke (border) color (opaque blue in this case)
+
+                                double radiusInMeters;
+                                geofenceCircle = mMap.addCircle(new CircleOptions()
+                                        .center(latLng)
+                                        .radius(100) // This should be the same radius as your geofence
+                                        .fillColor(fillColor)
+                                        .strokeColor(strokeColor)
+                                        .strokeWidth(2));
+
+                                mGeofencingClient.addGeofences(getGeofencingRequest(mGeofence), getGeofencePendingIntent());
+                                deleteGeoFenceBtn.setVisibility(FloatingActionButton.VISIBLE);
+                                // Optionally, add a marker on the map at the geofence location
+                                geofenceMarker = mMap.addMarker(new MarkerOptions().position(latLng).title("Geofence Marker"));
+                            }
+                        })
+                        .setNegativeButton("No", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                // User clicked "No", do nothing
+                                dialog.dismiss();
+                            }
+                        })
+                        .show();
+
+            }
+        });
+
+
+    }
+
+    private GeofencingRequest getGeofencingRequest(Geofence geofence) {
+        // [TODO] Set the initial trigger (i.e. what should be triggered if the user is already
+        // inside the Geofence when it is created)
+
+        return new GeofencingRequest.Builder()
+                .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER) // Trigger entry notification as soon as geofence is added
+                .addGeofence(geofence) // Add the passed geofence to the request
+                .build();
+
     }
 
     @Override
@@ -336,22 +454,19 @@ public class MapsActivity extends AppCompatActivity implements LocationListener,
     @Override
     public void onStatusChanged(String provider, int status, Bundle extras) {}
 
-    private GeofencingRequest getGeofenceRequest() {
-        // [TODO] Set the initial trigger (i.e. what should be triggered if the user is already
-        // inside the Geofence when it is created)
-
-        return new GeofencingRequest.Builder()
-                //.setInitialTrigger()  <--  Add triggers here
-                .addGeofence(mGeofence)
-                .build();
-    }
 
     private PendingIntent getGeofencePendingIntent() {
         if(mPendingIntent != null)
             return mPendingIntent;
 
         Intent intent = new Intent(MapsActivity.this, GeofenceBroadcastReceiver.class);
-        mPendingIntent = PendingIntent.getBroadcast(MapsActivity.this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+
+        int flag = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            flag |= PendingIntent.FLAG_IMMUTABLE;
+        }
+
+        mPendingIntent = PendingIntent.getBroadcast(MapsActivity.this, 0, intent, flag);
         return mPendingIntent;
     }
 
